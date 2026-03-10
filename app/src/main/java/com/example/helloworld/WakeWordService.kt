@@ -1,20 +1,27 @@
 package com.example.helloworld
 
-import ai.picovoice.porcupine.PorcupineManager
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
+import org.vosk.Model
+import org.vosk.Recognizer
+import org.vosk.android.RecognitionListener
+import org.vosk.android.SpeechService
+import org.vosk.android.StorageService
 import java.util.*
 
-class WakeWordService : Service() {
+class WakeWordService : Service(), RecognitionListener {
 
-    private lateinit var porcupineManager: PorcupineManager
+    private lateinit var model: Model
+    private lateinit var speechService: SpeechService
     private lateinit var tts: TextToSpeech
 
     override fun onCreate() {
         super.onCreate()
+
+        println("WakeWordService started")
 
         // Initialize Text To Speech
         tts = TextToSpeech(this) {
@@ -23,16 +30,51 @@ class WakeWordService : Service() {
             }
         }
 
-        // Initialize Porcupine wake word engine
-        porcupineManager = PorcupineManager.Builder()
-            .setAccessKey("YOUR_ACCESS_KEY")
-            .setKeywordPath("hello_jarvis.ppn")
-            .build(this) { keywordIndex ->
-                onWakeWordDetected()
-            }
+        // Load Vosk speech model
+        StorageService.unpack(
+            this,
+            "model",
+            "model",
+            { loadedModel ->
 
-        porcupineManager.start()
+                android.util.Log.d("JARVIS", "Model loaded")
+
+                model = loadedModel
+
+                val recognizer = Recognizer(
+                    model,
+                    16000.0f,
+                    "[\"hello jarvis\"]"
+                )
+
+                speechService = SpeechService(recognizer, 16000.0f)
+
+                speechService.startListening(this)
+
+                android.util.Log.d("JARVIS", "Listening started")
+
+            },
+            { exception ->
+                android.util.Log.e("JARVIS", "Model load failed", exception)
+            }
+        )
+
     }
+
+    override fun onPartialResult(hypothesis: String?) {
+
+        if (hypothesis?.contains("hello jarvis") == true) {
+            onWakeWordDetected()
+        }
+    }
+
+    override fun onResult(hypothesis: String?) {}
+
+    override fun onFinalResult(hypothesis: String?) {}
+
+    override fun onError(exception: Exception?) {}
+
+    override fun onTimeout() {}
 
     private fun onWakeWordDetected() {
 
@@ -62,7 +104,11 @@ class WakeWordService : Service() {
     override fun onDestroy() {
         super.onDestroy()
 
-        porcupineManager.stop()
+        if (::speechService.isInitialized) {
+            speechService.stop()
+            speechService.shutdown()
+        }
+
         tts.shutdown()
     }
 

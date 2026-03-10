@@ -5,16 +5,12 @@ plugins {
 
 android {
     namespace = "com.example.helloworld"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.helloworld"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -37,10 +33,15 @@ android {
     buildFeatures {
         compose = true
     }
+    
+    @Suppress("UnstableApiUsage")
+    androidResources {
+        noCompress += listOf("tflite", "ppn", "mdl", "fst", "conf", "int", "ie", "mat", "dubm", "stats")
+    }
 }
 
 dependencies {
-    implementation("ai.picovoice:porcupine-android:3.0.0")
+    implementation("com.alphacephei:vosk-android:0.3.47")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
