@@ -14,6 +14,8 @@ import java.util.*
 
 class WakeWordService : Service(), RecognitionListener {
 
+    private lateinit var jarvis: JarvisTTS
+
     private lateinit var model: Model
     private lateinit var speechService: SpeechService
     private lateinit var tts: TextToSpeech
@@ -22,6 +24,9 @@ class WakeWordService : Service(), RecognitionListener {
         super.onCreate()
 
         println("WakeWordService started")
+        jarvis = JarvisTTS(this)
+        jarvis.init()
+
 
         // Initialize Text To Speech
         tts = TextToSpeech(this) {
@@ -78,7 +83,9 @@ class WakeWordService : Service(), RecognitionListener {
 
     private fun onWakeWordDetected() {
 
-        speak("Yes sir")
+        jarvis.speak("Good evening sir. All systems are operational.")
+
+        //speak("Yes sir")
 
         startSpeechRecognition()
     }

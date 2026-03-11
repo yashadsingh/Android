@@ -42,6 +42,7 @@ android {
 
 dependencies {
     implementation("com.alphacephei:vosk-android:0.3.47")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.0")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
