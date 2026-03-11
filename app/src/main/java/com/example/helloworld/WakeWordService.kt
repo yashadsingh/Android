@@ -18,7 +18,10 @@ class WakeWordService : Service(), RecognitionListener {
 
     private lateinit var model: Model
     private lateinit var speechService: SpeechService
+    private lateinit var recognizer: Recognizer
     private lateinit var tts: TextToSpeech
+    
+    private var isProcessing = false
 
     override fun onCreate() {
         super.onCreate()
@@ -46,7 +49,7 @@ class WakeWordService : Service(), RecognitionListener {
 
                 model = loadedModel
 
-                val recognizer = Recognizer(
+                recognizer = Recognizer(
                     model,
                     16000.0f,
                     "[\"hello jarvis\"]"
@@ -67,25 +70,35 @@ class WakeWordService : Service(), RecognitionListener {
     }
 
     override fun onPartialResult(hypothesis: String?) {
-
-        if (hypothesis?.contains("hello jarvis") == true) {
+        // Check for the wake word and ensure we aren't already processing a detection
+        if (!isProcessing && hypothesis?.contains("hello jarvis") == true) {
+            isProcessing = true
             onWakeWordDetected()
         }
     }
 
-    override fun onResult(hypothesis: String?) {}
+    override fun onResult(hypothesis: String?) {
+        // Reset processing flag when a full result is processed
+        isProcessing = false
+    }
 
-    override fun onFinalResult(hypothesis: String?) {}
+    override fun onFinalResult(hypothesis: String?) {
+        isProcessing = false
+    }
 
-    override fun onError(exception: Exception?) {}
+    override fun onError(exception: Exception?) {
+        isProcessing = false
+    }
 
-    override fun onTimeout() {}
+    override fun onTimeout() {
+        isProcessing = false
+    }
 
     private fun onWakeWordDetected() {
+        // Reset the recognizer immediately to clear the partial result buffer
+        recognizer.reset()
 
         jarvis.speak("Good evening sir. All systems are operational.")
-
-        //speak("Yes sir")
 
         startSpeechRecognition()
     }
