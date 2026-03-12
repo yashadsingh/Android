@@ -26,6 +26,14 @@ class JarvisTTS(private val context: Context) : TextToSpeech.OnInitListener {
         if (status == TextToSpeech.SUCCESS) {
             tts?.language = Locale.UK
             tts?.setSpeechRate(1.3f)
+            tts?.voices?.forEach { voice ->
+
+                if (voice.name == "en-gb-x-gbd-local")
+                {
+                    tts?.voice = voice
+                    return@forEach
+                }
+            }
             ready = true
         }
     }
