@@ -1,14 +1,21 @@
 package com.example.helloworld
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import androidx.core.app.NotificationCompat
 import org.vosk.Model
 import org.vosk.Recognizer
 import org.vosk.android.StorageService
@@ -25,11 +32,24 @@ class WakeWordService : Service(), org.vosk.android.RecognitionListener {
     private var isProcessing = false
     private var commandRecognizer: SpeechRecognizer? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+    
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    companion object {
+        private const val CHANNEL_ID = "JarvisServiceChannel"
+        private const val NOTIFICATION_ID = 1
+    }
 
     override fun onCreate() {
         super.onCreate()
 
-        android.util.Log.d("JARVIS", "WakeWordService started")
+        android.util.Log.d("JARVIS", "WakeWordService creating")
+        
+        createNotificationChannel()
+        startForeground(NOTIFICATION_ID, createNotification())
+        
+        acquireWakeLock()
+
         jarvis = JarvisTTS(this)
         jarvis.init()
 
@@ -43,7 +63,6 @@ class WakeWordService : Service(), org.vosk.android.RecognitionListener {
             { loadedModel ->
                 android.util.Log.d("JARVIS", "Model loaded")
                 model = loadedModel
-                // Changed to just "jarvis"
                 recognizer = Recognizer(model, 16000.0f, "[\"jarvis\"]")
                 startVosk()
             },
@@ -51,6 +70,37 @@ class WakeWordService : Service(), org.vosk.android.RecognitionListener {
                 android.util.Log.e("JARVIS", "Model load failed", exception)
             }
         )
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        return START_STICKY
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val serviceChannel = NotificationChannel(
+                CHANNEL_ID,
+                "Jarvis Wake Word Service",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(serviceChannel)
+        }
+    }
+
+    private fun createNotification(): Notification {
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Jarvis is active")
+            .setContentText("Listening for 'Jarvis'...")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
+    private fun acquireWakeLock() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Jarvis::WakeLock")
+        wakeLock?.acquire()
     }
 
     private fun initCommandRecognizer() {
@@ -66,7 +116,6 @@ class WakeWordService : Service(), org.vosk.android.RecognitionListener {
                 override fun onEndOfSpeech() {}
                 override fun onError(error: Int) {
                     android.util.Log.e("JARVIS", "Command recognition error: $error")
-                    // If there's a timeout or error, we go back to Vosk (standby)
                     resumeVosk()
                 }
                 override fun onResults(results: Bundle?) {
@@ -75,7 +124,6 @@ class WakeWordService : Service(), org.vosk.android.RecognitionListener {
                         val command = matches[0].lowercase(Locale.ROOT)
                         android.util.Log.d("JARVIS", "Command received: $command")
                         
-                        // Check for exit commands
                         if (command.contains("got it") || command.contains("stop") || command.contains("thank you") || command.contains("goodbye")) {
                             jarvis.speak("Of course sir. Standing by.") {
                                 resumeVosk()
@@ -112,7 +160,6 @@ class WakeWordService : Service(), org.vosk.android.RecognitionListener {
     }
 
     override fun onPartialResult(hypothesis: String?) {
-        // Updated check for just "jarvis"
         if (!isProcessing && hypothesis?.contains("jarvis") == true) {
             isProcessing = true
             onWakeWordDetected()
@@ -135,9 +182,7 @@ class WakeWordService : Service(), org.vosk.android.RecognitionListener {
         android.util.Log.d("JARVIS", "Wake word detected!")
         stopVosk()
         
-        // Jarvis responds first
         jarvis.speak("Yes sir") {
-            // After speaking, start listening for the actual command
             startListeningForCommand()
         }
     }
@@ -154,9 +199,7 @@ class WakeWordService : Service(), org.vosk.android.RecognitionListener {
     }
 
     private fun processCommand(command: String) {
-        // Hit the remote API with the captured command
         jarvis.speakRemote(command) {
-            // After the remote response, KEEP LISTENING for the next command
             android.util.Log.d("JARVIS", "Response finished. Listening for next command...")
             startListeningForCommand()
         }
@@ -169,6 +212,9 @@ class WakeWordService : Service(), org.vosk.android.RecognitionListener {
             commandRecognizer?.destroy()
         }
         jarvis.shutdown()
+        wakeLock?.let {
+            if (it.isHeld) it.release()
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
