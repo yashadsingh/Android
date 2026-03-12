@@ -3,6 +3,7 @@ package com.example.helloworld
 import android.content.Context
 import android.media.MediaPlayer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import okhttp3.ResponseBody
 import retrofit2.Call
 import retrofit2.Callback
@@ -29,12 +30,26 @@ class JarvisTTS(private val context: Context) : TextToSpeech.OnInitListener {
         }
     }
 
-    fun speak(text: String) {
-        if (!ready) return
+    fun speak(text: String, onComplete: (() -> Unit)? = null) {
+        if (!ready) {
+            onComplete?.invoke()
+            return
+        }
+
+        tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+            override fun onDone(utteranceId: String?) {
+                onComplete?.invoke()
+            }
+            override fun onError(utteranceId: String?) {
+                onComplete?.invoke()
+            }
+        })
+
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis_tts")
     }
 
-    fun speakRemote(text: String) {
+    fun speakRemote(text: String, onComplete: (() -> Unit)? = null) {
         val request = VoiceRequest(
             userId = "android_user",
             audioData = text,
@@ -45,23 +60,22 @@ class JarvisTTS(private val context: Context) : TextToSpeech.OnInitListener {
             override fun onResponse(call: Call<ResponseBody>, response: Response<ResponseBody>) {
                 if (response.isSuccessful) {
                     response.body()?.let { body ->
-                        playWav(body)
+                        playWav(body, onComplete)
                     }
                 } else {
                     android.util.Log.e("JarvisTTS", "API Error: ${response.code()}")
-                    // Fallback to local TTS if API fails
-                    speak(text)
+                    speak(text, onComplete)
                 }
             }
 
             override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
                 android.util.Log.e("JarvisTTS", "API Failure", t)
-                speak(text)
+                speak(text, onComplete)
             }
         })
     }
 
-    private fun playWav(body: ResponseBody) {
+    private fun playWav(body: ResponseBody, onComplete: (() -> Unit)?) {
         try {
             val tempFile = File.createTempFile("jarvis_voice", "wav", context.cacheDir)
             tempFile.deleteOnExit()
@@ -77,9 +91,11 @@ class JarvisTTS(private val context: Context) : TextToSpeech.OnInitListener {
             mediaPlayer.setOnCompletionListener {
                 it.release()
                 tempFile.delete()
+                onComplete?.invoke()
             }
         } catch (e: Exception) {
             android.util.Log.e("JarvisTTS", "Failed to play WAV", e)
+            onComplete?.invoke()
         }
     }
 
