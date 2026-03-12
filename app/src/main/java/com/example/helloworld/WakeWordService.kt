@@ -4,13 +4,11 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.speech.RecognizerIntent
-import android.speech.tts.TextToSpeech
 import org.vosk.Model
 import org.vosk.Recognizer
 import org.vosk.android.RecognitionListener
 import org.vosk.android.SpeechService
 import org.vosk.android.StorageService
-import java.util.*
 
 class WakeWordService : Service(), RecognitionListener {
 
@@ -19,7 +17,6 @@ class WakeWordService : Service(), RecognitionListener {
     private lateinit var model: Model
     private lateinit var speechService: SpeechService
     private lateinit var recognizer: Recognizer
-    private lateinit var tts: TextToSpeech
     
     private var isProcessing = false
 
@@ -29,14 +26,6 @@ class WakeWordService : Service(), RecognitionListener {
         println("WakeWordService started")
         jarvis = JarvisTTS(this)
         jarvis.init()
-
-
-        // Initialize Text To Speech
-        tts = TextToSpeech(this) {
-            if (it == TextToSpeech.SUCCESS) {
-                tts.language = Locale.US
-            }
-        }
 
         // Load Vosk speech model
         StorageService.unpack(
@@ -98,7 +87,8 @@ class WakeWordService : Service(), RecognitionListener {
         // Reset the recognizer immediately to clear the partial result buffer
         recognizer.reset()
 
-        jarvis.speak("Good evening sir. All systems are operational.")
+        // Call the remote API for the Jarvis voice response
+        jarvis.speakRemote("Yes sir, I am here. How can I help you?")
 
         startSpeechRecognition()
     }
@@ -117,10 +107,6 @@ class WakeWordService : Service(), RecognitionListener {
         startActivity(intent)
     }
 
-    private fun speak(text: String) {
-        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
-    }
-
     override fun onDestroy() {
         super.onDestroy()
 
@@ -128,8 +114,8 @@ class WakeWordService : Service(), RecognitionListener {
             speechService.stop()
             speechService.shutdown()
         }
-
-        tts.shutdown()
+        
+        jarvis.shutdown()
     }
 
     override fun onBind(intent: Intent?): IBinder? {

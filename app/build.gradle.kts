@@ -36,13 +36,19 @@ android {
     
     @Suppress("UnstableApiUsage")
     androidResources {
-        noCompress += listOf("tflite", "ppn", "mdl", "fst", "conf", "int", "ie", "mat", "dubm", "stats")
+        noCompress += listOf("tflite", "ppn", "mdl", "fst", "conf", "int", "ie", "mat", "dubm", "stats", "onnx")
     }
 }
 
 dependencies {
     implementation("com.alphacephei:vosk-android:0.3.47")
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.0")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.24.3")
+    
+    // Networking
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
